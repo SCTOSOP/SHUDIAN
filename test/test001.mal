@@ -9,3 +9,4 @@ print re                ;
 s [ s1 s2 s3 ]          ;
 s.setMin [ 3 5 6 7 ]    ;
 print s.bool            ;
+// TODO
