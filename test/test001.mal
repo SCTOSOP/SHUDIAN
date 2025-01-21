@@ -6,3 +6,6 @@ tmp2 and s1 s3          ;
 tmp3 and s2 s3          ;
 re or tmp1 tmp2 tmp3    ;
 print re                ;
+s set s1 s2 s3          ;
+s min 3 5 6 7           ;
+print s                 ;

@@ -29,7 +29,16 @@ enum class LogicKeywords
     none,
     AND,
     OR,
-    NOT
+    NOT,
+    min,
+    max,
+    set
+};
+
+struct Logic
+{
+    std::vector<std::shared_ptr<bool>> values;
+    std::vector<int> mins;
 };
 
 class Interpreter
@@ -72,10 +81,11 @@ private:
     bool isValidCppIdentifier(const std::string &identifier);
 
     // 变量池
-    std::unordered_map<std::string, bool> variablePool;
+    std::unordered_map<std::string, std::shared_ptr<bool>> variablePool;
+    std::unordered_map<std::string, Logic> logicPool;
 
     // 处理未知类型的指令
-    void AddTheValueToThePool(const std::string &instruction);
+    void AddValueToVariablePool(const std::string &instruction);
 
     // 将字符串转换为布尔值
     bool convertToBool(const std::string &str);

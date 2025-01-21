@@ -3,17 +3,8 @@
 #include <iostream>
 
 // 初始化关键字集合
-const std::unordered_set<std::string> Interpreter::logicKeywords = {"and", "or", "not"};
+const std::unordered_set<std::string> Interpreter::logicKeywords = {"and", "or", "not", "set", "min", "max"};
 const std::unordered_set<std::string> Interpreter::functionKeywords = {"print", "input"};
-
-void CheckTheValueToVector(std::vector<std::string> &vec, std::string &str)
-{
-    if (str == "" || str == " ")
-    {
-        return;
-    }
-    vec.push_back(str);
-}
 
 // 构造函数，接受std::vector<std::string>作为参数
 Interpreter::Interpreter(const std::vector<std::string> &instructions)
@@ -38,6 +29,7 @@ void Interpreter::Run()
     while (currentInstruction < instructions.size())
     {
         Step();
+        line++;
     }
     end_time_ = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end_time_ - start_time_).count();
@@ -65,7 +57,7 @@ void Interpreter::Step()
     std::string left_;
     std::vector<std::string> right_;
     FunctionKeywords func = FunctionKeywords::none;
-    LogicKeywords lgs = LogicKeywords::none;
+    std::string lgs = "";
 
     size_t currentNumInLine = 0;
     while (currentNumInLine < currentLine.size())
@@ -78,18 +70,7 @@ void Interpreter::Step()
         {
         case InstructionType::LogicKeyword:
             // 处理逻辑关键字
-            if (instruction == "and")
-            {
-                lgs = LogicKeywords::AND;
-            }
-            else if (instruction == "or")
-            {
-                lgs = LogicKeywords::OR;
-            }
-            else if (instruction == "not")
-            {
-                lgs = LogicKeywords::NOT;
-            }
+            lgs = instruction;
             break;
         case InstructionType::FunctionKeyword:
             // 处理函数关键字
@@ -108,7 +89,7 @@ void Interpreter::Step()
             // 处理用户变量
             if (left_.empty())
             {
-                AddTheValueToThePool(instruction);
+                AddValueToVariablePool(instruction);
                 left_ = instruction;
             }
             else
@@ -147,11 +128,11 @@ void Interpreter::Step()
     }
 
     bool tmp = false;
-    switch (lgs)
+    if (lgs == "none")
     {
-    case LogicKeywords::none:
-        break;
-    case LogicKeywords::AND:
+    }
+    else if (lgs == "and")
+    {
         tmp = convertToBool(right_[0]);
         for (size_t i = 1; i < right_.size(); i++)
         {
@@ -159,8 +140,9 @@ void Interpreter::Step()
         }
         right_.clear();
         right_.push_back(std::to_string(tmp));
-        break;
-    case LogicKeywords::OR:
+    }
+    else if (lgs == "or")
+    {
         tmp = convertToBool(right_[0]);
         for (size_t i = 1; i < right_.size(); i++)
         {
@@ -168,18 +150,35 @@ void Interpreter::Step()
         }
         right_.clear();
         right_.push_back(std::to_string(tmp));
-        break;
-    case LogicKeywords::NOT:
+    }
+    else if (lgs == "not")
+    {
         tmp = !convertToBool(right_[0]);
         right_.clear();
         right_.push_back(std::to_string(tmp));
-        break;
+    }
+    else if (lgs == "set")
+    {
+        Logic logic;
+        for (const std::string &word : right_)
+        {
+            logic.values.push_back(this->variablePool[word]);
+        }
+    }
+    else if (lgs == "min")
+    {
+    }
+    else if (lgs == "max")
+    {
     }
 
     switch (func)
     {
     case FunctionKeywords::none:
-        variablePool[left_] = convertToBool(right_[0]);
+        if (this->variablePool.find(left_) != this->variablePool.end())
+        {
+            variablePool[left_] = std::make_shared<bool>(convertToBool(right_[0]));
+        }
         break;
     case FunctionKeywords::print:
         for (const std::string &word : right_)
@@ -193,7 +192,7 @@ void Interpreter::Step()
         std::cout << "\033[42m请输入变量 " << left_ << " :\033[0m";
         std::cin >> tmp_input;
         auto resume_time = std::chrono::high_resolution_clock::now();
-        variablePool[left_] = convertToBool(tmp_input);
+        variablePool[left_] = std::make_shared<bool>(convertToBool(tmp_input));
         start_time_ += (resume_time - pause_time); // Adjust start_time to exclude input time
         break;
     }
@@ -215,13 +214,9 @@ InstructionType Interpreter::getInstructionType(const std::string &instruction) 
     {
         return InstructionType::FunctionKeyword;
     }
-    if (instruction == "1" || instruction == "0")
+    if (std::all_of(instruction.begin(), instruction.end(), ::isdigit))
     {
         return InstructionType::Constant;
-    }
-    if (std::all_of(instruction.begin(), instruction.end(), ::isdigit) && instruction != "0" && instruction != "1")
-    {
-        return InstructionType::Illegal;
     }
     return InstructionType::Unknown;
 }
@@ -248,7 +243,6 @@ bool Interpreter::isValidCppIdentifier(const std::string &identifier)
         }
     }
 
-    // 检查是否为C++关键字
     if ((logicKeywords.find(identifier) != logicKeywords.end()) && (functionKeywords.find(identifier) != functionKeywords.end()))
     {
         return false;
@@ -258,7 +252,7 @@ bool Interpreter::isValidCppIdentifier(const std::string &identifier)
 }
 
 // 处理未知类型的指令
-void Interpreter::AddTheValueToThePool(const std::string &instruction)
+void Interpreter::AddValueToVariablePool(const std::string &instruction)
 {
     if (!isValidCppIdentifier(instruction))
     {
@@ -273,7 +267,8 @@ void Interpreter::AddTheValueToThePool(const std::string &instruction)
     // 假设未知类型的指令是变量名，并将其添加到变量池中，初始值为false
     if (variablePool.find(instruction) == variablePool.end())
     {
-        variablePool[instruction] = false;
+
+        variablePool[instruction] = std::make_shared<bool>(false);
         // std::cout << "\033[41mAdded variable: " << instruction << " with initial value false at line " << line << "\033[0m" << std::endl;
     }
 }
@@ -291,7 +286,10 @@ bool Interpreter::convertToBool(const std::string &str)
     }
     else
     {
-        return convertToBool(std::to_string(variablePool[str]));
+        if (this->variablePool.find(str) != this->variablePool.end())
+            return convertToBool(std::to_string(*variablePool[str]));
+        reportError("Attempting to convert an unknown value to bool", line);
+        throw std::runtime_error("Attempting to convert an unknown value to bool");
     }
 }
 
