@@ -1,37 +1,76 @@
 #include "interpreter.h"
+#include "file.h"
 #include <iostream>
-#include <unordered_set>
-#include <unordered_map>
 
 // 初始化关键字集合
 const std::unordered_set<std::string> Interpreter::logicKeywords = {"and", "or", "not"};
 const std::unordered_set<std::string> Interpreter::functionKeywords = {"print", "input"};
 
+void CheckTheValueToVector(std::vector<std::string> &vec, std::string &str)
+{
+    if (str == "" || str == " ")
+    {
+        return;
+    }
+    vec.push_back(str);
+}
+
 // 构造函数，接受std::vector<std::string>作为参数
 Interpreter::Interpreter(const std::vector<std::string> &instructions)
     : instructions(instructions), currentInstruction(0), line(1) {}
 
+Interpreter::Interpreter(std::string &filename)
+    : Interpreter(File(filename).splitContent(File(filename).readFile()))
+{
+    this->filename = filename;
+}
+
+Interpreter::~Interpreter()
+{
+    instructions.clear();
+    variablePool.clear();
+}
+
 // 运行解释器
 void Interpreter::Run()
 {
+    start_time_ = std::chrono::high_resolution_clock::now();
     while (currentInstruction < instructions.size())
     {
         Step();
     }
+    end_time_ = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end_time_ - start_time_).count();
+    run_duration_ = std::to_string(duration);
 }
 
 // 单步执行
 void Interpreter::Step()
 {
+    std::vector<std::string> currentLine;
+    for (currentInstruction; currentInstruction < instructions.size(); currentInstruction++)
+    {
+        if (instructions[currentInstruction] == ";")
+        {
+            currentInstruction++;
+            break;
+        }
+        currentLine.push_back(instructions[currentInstruction]);
+    }
+    if (currentLine.empty())
+    {
+        return;
+    }
+
     std::string left_;
     std::vector<std::string> right_;
     FunctionKeywords func = FunctionKeywords::none;
     LogicKeywords lgs = LogicKeywords::none;
 
-    bool loop = true;
-    while (currentInstruction < instructions.size() && loop)
+    size_t currentNumInLine = 0;
+    while (currentNumInLine < currentLine.size())
     {
-        std::string instruction = instructions[currentInstruction];
+        std::string instruction = currentLine[currentNumInLine];
         InstructionType type = getInstructionType(instruction);
         // std::cout << "Executing: " << instruction << " (Type: " << static_cast<int>(type) << ")" << std::endl;
 
@@ -47,6 +86,10 @@ void Interpreter::Step()
             {
                 lgs = LogicKeywords::OR;
             }
+            else if (instruction == "not")
+            {
+                lgs = LogicKeywords::NOT;
+            }
             break;
         case InstructionType::FunctionKeyword:
             // 处理函数关键字
@@ -61,23 +104,18 @@ void Interpreter::Step()
                 right_.push_back("-");
             }
             break;
-        case InstructionType::Separator:
-            // 处理分割符
-            line++;       // 遇到分隔符，行号加一
-            loop = false; // 结束当前步骤并跳出while循环
-            break;
         case InstructionType::Unknown:
             // 处理用户变量
             if (left_.empty())
             {
-                handleUnknownInstruction(instruction);
+                AddTheValueToThePool(instruction);
                 left_ = instruction;
             }
             else
             {
                 if (variablePool.find(instruction) == variablePool.end())
                 {
-                    std::cerr << "\033[41mError: Undefined variable " << instruction << " used as right value at line " << line << "\033[0m" << std::endl;
+                    reportError("Undefined variable used as right value", line);
                     throw std::runtime_error("Undefined variable used as right value");
                 }
                 right_.push_back(instruction);
@@ -87,29 +125,24 @@ void Interpreter::Step()
             // 处理常量
             if (func == FunctionKeywords::none && left_.empty())
             {
-                std::cerr << "\033[41mError: Constant cannot be used as left value at line " << line << "\033[0m" << std::endl;
+                reportError("Constant cannot be used as left value", line);
                 throw std::runtime_error("Constant cannot be used as left value");
-            }
-            if (!right_.empty())
-            {
-                std::cerr << "\033[41mError: Extra right value at line " << line << "\033[0m" << std::endl;
-                throw std::runtime_error("Extra right value");
             }
             right_.push_back(instruction);
             break;
         case InstructionType::Illegal:
             // 处理错误
-            std::cerr << "\033[41mError: Illegal instruction encountered at line " << line << "\033[0m" << std::endl;
+            reportError("Illegal instruction encountered", line);
             throw std::runtime_error("Illegal instruction encountered");
             break;
         }
 
-        currentInstruction++;
+        currentNumInLine++;
     }
 
     if (right_.empty())
     {
-        std::cerr << "\033[41mError: Right value should not be empty in a statement at line " << line << "\033[0m" << std::endl;
+        reportError("Right value should not be empty in a statement", line);
         throw std::runtime_error("Right value should not be empty in a statement");
     }
 
@@ -155,12 +188,20 @@ void Interpreter::Step()
         }
         break;
     case FunctionKeywords::input:
+        auto pause_time = std::chrono::high_resolution_clock::now();
         std::string tmp_input = "0";
         std::cout << "\033[42m请输入变量 " << left_ << " :\033[0m";
         std::cin >> tmp_input;
+        auto resume_time = std::chrono::high_resolution_clock::now();
         variablePool[left_] = convertToBool(tmp_input);
+        start_time_ += (resume_time - pause_time); // Adjust start_time to exclude input time
         break;
     }
+}
+
+std::string Interpreter::getRunDuration() const
+{
+    return run_duration_;
 }
 
 // 返回当前指令的类型
@@ -174,10 +215,6 @@ InstructionType Interpreter::getInstructionType(const std::string &instruction) 
     {
         return InstructionType::FunctionKeyword;
     }
-    if (instruction == ";")
-    {
-        return InstructionType::Separator;
-    }
     if (instruction == "1" || instruction == "0")
     {
         return InstructionType::Constant;
@@ -189,9 +226,50 @@ InstructionType Interpreter::getInstructionType(const std::string &instruction) 
     return InstructionType::Unknown;
 }
 
-// 处理未知类型的指令
-void Interpreter::handleUnknownInstruction(const std::string &instruction)
+bool Interpreter::isValidCppIdentifier(const std::string &identifier)
 {
+    if (identifier.empty())
+    {
+        return false;
+    }
+
+    // 检查第一个字符是否为字母或下划线
+    if (!std::isalpha(identifier[0]) && identifier[0] != '_')
+    {
+        return false;
+    }
+
+    // 检查剩余字符是否为字母、数字或下划线
+    for (size_t i = 1; i < identifier.size(); ++i)
+    {
+        if (!std::isalnum(identifier[i]) && identifier[i] != '_')
+        {
+            return false;
+        }
+    }
+
+    // 检查是否为C++关键字
+    if ((logicKeywords.find(identifier) != logicKeywords.end()) && (functionKeywords.find(identifier) != functionKeywords.end()))
+    {
+        return false;
+    }
+
+    return true;
+}
+
+// 处理未知类型的指令
+void Interpreter::AddTheValueToThePool(const std::string &instruction)
+{
+    if (!isValidCppIdentifier(instruction))
+    {
+        reportError("Invalid variable name", line);
+        throw std::runtime_error("Invalid variable name");
+    }
+    if (instruction == "1" || instruction == "0")
+    {
+        reportError("'1' or '0' is polluting the variable pool", line);
+        throw std::runtime_error("'1' or '0' is polluting the variable pool");
+    }
     // 假设未知类型的指令是变量名，并将其添加到变量池中，初始值为false
     if (variablePool.find(instruction) == variablePool.end())
     {
@@ -215,4 +293,9 @@ bool Interpreter::convertToBool(const std::string &str)
     {
         return convertToBool(std::to_string(variablePool[str]));
     }
+}
+
+void Interpreter::reportError(const std::string &errorMessage, int line) const
+{
+    std::cerr << "\033[41m[" << filename << ":" << line << "]Error: " << errorMessage << "\033[0m" << std::endl;
 }
