@@ -157,6 +157,7 @@ void Interpreter::Step()
 		return;
 	}
 
+
 	if (currentLine[1] == "1" || currentLine[1] == "0")
 	{
 		variablePool[currentLine[0]] = std::make_shared<bool>(convertToBool(currentLine[1]));
