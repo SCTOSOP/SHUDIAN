@@ -29,7 +29,18 @@ enum class LogicKeywords
     none,
     AND,
     OR,
-    NOT
+    NOT,
+    set,
+    min
+};
+
+struct Logic
+{
+    std::vector<std::shared_ptr<bool>> values;
+    std::unordered_set<int> mins;
+
+    // 将values中的bool值组合成二进制数并转换为十进制，并判断存在于mins中
+    bool isValueInMins() const;
 };
 
 class Interpreter
@@ -54,38 +65,40 @@ public:
 private:
     std::string filename;
 
-    std::vector<std::string>
-        instructions;
+    std::vector<std::string> instructions;
     size_t currentInstruction;
-    int line; // 行号
 
-    // 返回当前指令的类型
-    InstructionType getInstructionType(const std::string &instruction) const;
+    // 行号
+    int line;
+
+    std::vector<std::vector<std::string>> GetLogicWords(std::vector<std::string> &currentLine);
+
+    // 逻辑
+    bool LogicProcessing(std::vector<std::vector<std::string>> &words);
 
     // 处理逻辑关键字
-    static const std::unordered_set<std::string>
-        logicKeywords;
+    static const std::unordered_set<std::string> logicKeywords;
     // 处理函数关键字
-    static const std::unordered_set<std::string>
-        functionKeywords;
-    // 检查一个字符串是否满足C++变量的命名规则
-    bool isValidCppIdentifier(const std::string &identifier);
+    static const std::unordered_set<std::string> functionKeywords;
 
     // 变量池
-    std::unordered_map<std::string, bool> variablePool;
+    std::unordered_map<std::string, std::shared_ptr<bool>> variablePool;
+    // 逻辑池
+    std::unordered_map<std::string, Logic> LogicPool;
 
-    // 处理未知类型的指令
-    void AddTheValueToThePool(const std::string &instruction);
+    std::chrono::high_resolution_clock::time_point start_time_;
+    std::chrono::high_resolution_clock::time_point end_time_;
+    std::string run_duration_;
 
+    // 检查一个字符串是否满足C++变量的命名规则
+    bool isValidCppIdentifier(const std::string &identifier);
     // 将字符串转换为布尔值
     bool convertToBool(const std::string &str);
 
     /// @brief  报告错误
     void reportError(const std::string &errorMessage, int line) const;
-
-    std::chrono::high_resolution_clock::time_point start_time_;
-    std::chrono::high_resolution_clock::time_point end_time_;
-    std::string run_duration_;
+    /// @brief  报告警告
+    void reportWarning(const std::string &warningMessage, int line) const;
 };
 
 #endif // INTERPRETER_H

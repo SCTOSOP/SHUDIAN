@@ -1,8 +1,13 @@
-input s1                ;
-input s2                ;
-input s3                ;
+input s1 s2 s3          ;
+print s1 s2 s3          ;
 tmp1 and s1 s2          ;
 tmp2 and s1 s3          ;
 tmp3 and s2 s3          ;
 re or tmp1 tmp2 tmp3    ;
+print re                ;
+re or [ and s1 s2 ] [ and s1 s3 ] [ and s2 s3 ] ;
+print re                ;
+s set s1 s2 s3          ;
+s min 3 5 6 7           ;
+re s                    ;
 print re                ;
