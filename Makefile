@@ -14,7 +14,7 @@ clean:
 
 main: $(SOURCE)
 	mkdir -p ./build
-	g++ -g -I $(PATHHAEAD) -o $(PATHBUUILD)/main $(SOURCE) --std=c++20
+	g++ -g -I $(PATHHAEAD) -o $(PATHBUUILD)/main $(SOURCE) --std=c++20 -O3
 
 test: all
 	lldb $(PATHBUUILD)/main $(ARGS)
