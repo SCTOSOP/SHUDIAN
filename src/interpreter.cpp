@@ -130,7 +130,7 @@ void Interpreter::Step()
 			logic.values.push_back(this->variablePool[currentLine[i]]);
 		}
 		this->LogicPool[currentLine[0]] = logic;
-
+    
 		return;
 	}
 	else if (currentLine[1] == "min")
