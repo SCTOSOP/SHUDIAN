@@ -29,6 +29,7 @@ void Interpreter::Run()
 	while (currentInstruction < instructions.size())
 	{
 		Step();
+		line++;
 	}
 	end_time_ = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end_time_ - start_time_).count();
@@ -77,15 +78,29 @@ void Interpreter::Step()
 		currentIndexInLine++;
 		while (currentIndexInLine < currentLine.size())
 		{
-			if (variablePool.find(currentLine[currentIndexInLine]) == variablePool.end())
+			std::shared_ptr<bool> tmp_bool;
+			if (variablePool.find(currentLine[currentIndexInLine]) != variablePool.end())
+			{
+				tmp_bool = variablePool[currentLine[currentIndexInLine]];
+			}
+			else if (LogicPool.find(currentLine[currentIndexInLine]) != LogicPool.end())
+			{
+				auto &logic = LogicPool[currentLine[currentIndexInLine]];
+			}
+			else
 			{
 				reportError("Variable not found", line);
 				throw std::runtime_error("Variable not found");
 			}
-			std::cout << "\033[42m" << currentLine[currentIndexInLine] << " = " << *variablePool[currentLine[currentIndexInLine]] << "\033[0m" << std::endl;
+			std::cout << "\033[42m" << currentLine[currentIndexInLine] << " = " << *tmp_bool << "\033[0m" << std::endl;
 			currentIndexInLine++;
 		}
 
+		return;
+	}
+	if (currentLine.size() < 2)
+	{
+		reportWarning("Unused line", line);
 		return;
 	}
 
@@ -96,11 +111,44 @@ void Interpreter::Step()
 		auto subLine = std::vector<std::string>(currentLine.begin() + 1, currentLine.end());
 		auto words = this->GetLogicWords(subLine);
 		tmp_logic_bool = this->LogicProcessing(words);
+		this->variablePool[currentLine[0]] = std::make_shared<bool>(tmp_logic_bool);
 	}
 
-	this->variablePool[currentLine[0]] = std::make_shared<bool>(tmp_logic_bool);
-
-	line++;
+	if (currentLine[1] == "set")
+	{
+		Logic logic;
+		for (size_t i = 2; i < currentLine.size(); i++)
+		{
+			if (variablePool.find(currentLine[i]) == variablePool.end())
+			{
+				reportError("Variable not found", line);
+				throw std::runtime_error("Variable not found");
+			}
+			logic.values.push_back(this->variablePool[currentLine[i]]);
+		}
+		this->LogicPool[currentLine[0]] = logic;
+	}
+	else if (currentLine[1] == "min")
+	{
+		if (LogicPool.find(currentLine[0]) == LogicPool.end())
+		{
+			reportError("Variable not found", line);
+			throw std::runtime_error("Variable not found");
+		}
+		auto &logic = LogicPool[currentLine[0]];
+		for (size_t i = 2; i < currentLine.size(); i++)
+		{
+			int tmp_int = atoi(currentLine[i].c_str());
+			if (tmp_int < 0 || tmp_int > pow(2, logic.values.size()) - 1)
+			{
+				reportWarning("Meaningless number", line);
+			}
+			else
+			{
+				logic.mins.insert(tmp_int);
+			}
+		}
+	}
 }
 
 std::string Interpreter::getRunDuration() const
@@ -253,4 +301,22 @@ bool Interpreter::convertToBool(const std::string &str)
 void Interpreter::reportError(const std::string &errorMessage, int line) const
 {
 	std::cerr << "\033[41m[" << filename << ":" << line << "]Error: " << errorMessage << "\033[0m" << std::endl;
+}
+
+void Interpreter::reportWarning(const std::string &warningMessage, int line) const
+{
+	std::cerr << "\033[43m[" << filename << ":" << line << "]Warning: " << warningMessage << "\033[0m" << std::endl;
+}
+
+bool Logic::isValueInMins() const
+{
+	int decimalValue = 0;
+	for (size_t i = 0; i < values.size(); ++i)
+	{
+		if (*values[i])
+		{
+			decimalValue += (1 << (values.size() - 1 - i));
+		}
+	}
+	return mins.find(decimalValue) != mins.end();
 }

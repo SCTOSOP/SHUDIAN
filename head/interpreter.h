@@ -37,7 +37,10 @@ enum class LogicKeywords
 struct Logic
 {
     std::vector<std::shared_ptr<bool>> values;
-    std::vector<int> mins;
+    std::unordered_set<int> mins;
+
+    // 将values中的bool值组合成二进制数并转换为十进制，并判断存在于mins中
+    bool isValueInMins() const;
 };
 
 class Interpreter
@@ -94,6 +97,8 @@ private:
 
     /// @brief  报告错误
     void reportError(const std::string &errorMessage, int line) const;
+    /// @brief  报告警告
+    void reportWarning(const std::string &warningMessage, int line) const;
 };
 
 #endif // INTERPRETER_H
