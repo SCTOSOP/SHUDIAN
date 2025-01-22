@@ -3,7 +3,7 @@
 #include <iostream>
 
 // 初始化关键字集合
-const std::unordered_set<std::string> Interpreter::logicKeywords = {"and", "or", "not"};
+const std::unordered_set<std::string> Interpreter::logicKeywords = {"and", "or", "not", "min", "set"};
 const std::unordered_set<std::string> Interpreter::functionKeywords = {"print", "input"};
 
 // 构造函数，接受std::vector<std::string>作为参数
@@ -86,6 +86,7 @@ void Interpreter::Step()
 			else if (LogicPool.find(currentLine[currentIndexInLine]) != LogicPool.end())
 			{
 				auto &logic = LogicPool[currentLine[currentIndexInLine]];
+				tmp_bool = std::make_shared<bool>(logic.isValueInMins());
 			}
 			else
 			{
@@ -112,6 +113,8 @@ void Interpreter::Step()
 		auto words = this->GetLogicWords(subLine);
 		tmp_logic_bool = this->LogicProcessing(words);
 		this->variablePool[currentLine[0]] = std::make_shared<bool>(tmp_logic_bool);
+
+		return;
 	}
 
 	if (currentLine[1] == "set")
@@ -127,6 +130,8 @@ void Interpreter::Step()
 			logic.values.push_back(this->variablePool[currentLine[i]]);
 		}
 		this->LogicPool[currentLine[0]] = logic;
+
+		return;
 	}
 	else if (currentLine[1] == "min")
 	{
@@ -148,6 +153,23 @@ void Interpreter::Step()
 				logic.mins.insert(tmp_int);
 			}
 		}
+
+		return;
+	}
+
+	if (variablePool.find(currentLine[1]) != variablePool.end())
+	{
+		variablePool[currentLine[0]] = variablePool[currentLine[1]];
+	}
+	else if (LogicPool.find(currentLine[1]) != LogicPool.end())
+	{
+		auto &logic = LogicPool[currentLine[1]];
+		variablePool[currentLine[0]] = std::make_shared<bool>(logic.isValueInMins());
+	}
+	else
+	{
+		reportError("Variable not found", line);
+		throw std::runtime_error("Variable not found");
 	}
 }
 
